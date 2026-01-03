@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Real-Time Job Progress Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        @theme {
+            --color-background: oklch(100% 0 0);
+            --color-foreground: oklch(15% 0.01 285);
+            --color-card: oklch(100% 0 0);
+            --color-muted: oklch(96% 0.004 285);
+            --color-muted-foreground: oklch(55% 0.015 285);
+            --color-border: oklch(92% 0.01 285);
+            --color-primary: oklch(60% 0.22 255);
+            --color-accent: oklch(55% 0.18 160);
+            --color-accent-foreground: oklch(98% 0.01 340);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            @theme {
+                --color-background: oklch(15% 0.02 285);
+                --color-foreground: oklch(98% 0.004 285);
+                --color-card: oklch(15% 0.02 285);
+                --color-muted: oklch(25% 0.015 285);
+                --color-muted-foreground: oklch(70% 0.01 285);
+                --color-border: oklch(25% 0.015 285);
+                --color-primary: oklch(60% 0.22 255);
+                --color-accent: oklch(55% 0.18 160);
+                --color-accent-foreground: oklch(98% 0.01 340);
+            }
+        }
+
+        .dark {
+            --color-background: oklch(15% 0.02 285);
+            --color-foreground: oklch(98% 0.004 285);
+            --color-card: oklch(15% 0.02 285);
+            --color-muted: oklch(25% 0.015 285);
+            --color-muted-foreground: oklch(70% 0.01 285);
+            --color-border: oklch(25% 0.015 285);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+    <script>
+        (function () {
+            const storageKey = "theme";
+            const root = document.documentElement;
+            const stored = localStorage.getItem(storageKey);
+            const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+            if (stored === "dark" || (!stored && prefersDark)) root.classList.add("dark");
+        })();
+    </script>
+</head>
+
+<body class="min-h-screen bg-background text-foreground">
+    <div class="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <header class="mb-12">
+            <a href="/" class="mb-6 -ml-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+                </svg>
+                Back to Dashboard
+            </a>
+            <div class="text-center">
+                <h1 class="mb-3 text-4xl font-bold tracking-tight text-balance lg:text-5xl">Real-Time Job Progress Tracker</h1>
+                <p class="text-muted-foreground">WebSocket-powered background job monitoring</p>
+            </div>
+        </header>
+
+        <!-- Main Job Card -->
+        <section class="mb-8 rounded-2xl border border-border bg-card shadow-lg">
+            <div class="p-6 sm:p-8">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Job Type</p>
+                        <h2 class="text-2xl font-semibold">{{ job_type }}</h2>
+                    </div>
+                    <span id="status-badge"
+                        class="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                        <svg id="status-icon-processing" class="h-3.5 w-3.5 spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-6.219-8.56" />
+                        </svg>
+                        <svg id="status-icon-complete" class="hidden h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5" />
+                        </svg>
+                        <span id="status-badge-text">Processing</span>
+                    </span>
+                </div>
+
+                <div class="mt-8 space-y-8">
+                    <!-- Job ID -->
+                    <div>
+                        <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Job ID</p>
+                        <div class="flex items-center gap-2">
+                            <code class="flex-1 rounded-lg bg-muted px-4 py-3 font-mono text-sm">{{ id }}</code>
+                            <button id="copy-btn" type="button"
+                                class="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-transparent transition-colors hover:bg-muted"
+                                aria-label="Copy job id">
+                                <svg id="copy-icon" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                <svg id="check-icon" class="hidden h-4 w-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Status Message -->
+                    <div id="status-line" class="flex items-center gap-3 text-sm text-muted-foreground">
+                        <svg id="status-line-spinner" class="h-4 w-4 spin text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-6.219-8.56" />
+                        </svg>
+                        <span id="status-line-text">Starting…</span>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div>
+                        <div class="mb-3 flex items-end justify-between">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Progress</p>
+                            <p id="progress-percent" class="text-3xl font-bold tabular-nums">0%</p>
+                        </div>
+                        <div class="h-3 w-full overflow-hidden rounded-full bg-muted">
+                            <div id="progress-fill" class="h-3 rounded-full bg-primary transition-all" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Connection Status -->
+                    <div class="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
+                        <span class="text-sm font-medium">WebSocket Connection</span>
+                        <span id="connection-badge" class="inline-flex items-center rounded-full border border-border bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+                            <span id="connection-dot" class="mr-2 inline-block h-2 w-2 rounded-full bg-accent"></span>
+                            <span id="connection-text">Connected</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Job History -->
+        <section class="rounded-2xl border border-border bg-card">
+            <div class="p-6 sm:p-8">
+                <h3 class="text-xl font-semibold">Job History</h3>
+                <div id="history-empty" class="py-8 text-center text-sm text-muted-foreground">No completed jobs yet</div>
+                <div id="history-list" class="hidden space-y-3"></div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${wsScheme}://${window.location.host}/ws/{{ id }}`);
+
+        const progressFill = document.getElementById("progress-fill");
+        const progressPercent = document.getElementById("progress-percent");
+
+        const statusBadge = document.getElementById("status-badge");
+        const statusBadgeText = document.getElementById("status-badge-text");
+        const statusIconProcessing = document.getElementById("status-icon-processing");
+        const statusIconComplete = document.getElementById("status-icon-complete");
+
+        const statusLine = document.getElementById("status-line");
+        const statusLineSpinner = document.getElementById("status-line-spinner");
+        const statusLineText = document.getElementById("status-line-text");
+
+        const connectionBadge = document.getElementById("connection-badge");
+        const connectionDot = document.getElementById("connection-dot");
+        const connectionText = document.getElementById("connection-text");
+
+        const historyEmpty = document.getElementById("history-empty");
+        const historyList = document.getElementById("history-list");
+
+        const copyBtn = document.getElementById("copy-btn");
+        const copyIcon = document.getElementById("copy-icon");
+        const checkIcon = document.getElementById("check-icon");
+
+        let currentProgress = 0;
+        let completed = false;
+
+        function setConnected(isConnected) {
+            if (isConnected) {
+                connectionBadge.className = "inline-flex items-center rounded-full border border-border bg-accent/10 px-3 py-1 text-xs font-medium text-accent";
+                connectionDot.className = "mr-2 inline-block h-2 w-2 rounded-full bg-accent";
+                connectionText.textContent = "Connected";
+            } else {
+                connectionBadge.className = "inline-flex items-center rounded-full border border-border bg-red-500/10 px-3 py-1 text-xs font-medium text-red-600";
+                connectionDot.className = "mr-2 inline-block h-2 w-2 rounded-full bg-red-500";
+                connectionText.textContent = "Disconnected";
+            }
+        }
+
+        function setStatusProcessing(message) {
+            statusBadge.className = "inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary";
+            statusBadgeText.textContent = "Processing";
+            statusIconProcessing.classList.remove("hidden");
+            statusIconComplete.classList.add("hidden");
+
+            statusLine.className = "flex items-center gap-3 text-sm text-muted-foreground";
+            statusLineSpinner.classList.remove("hidden");
+            statusLineText.textContent = message;
+        }
+
+        function setStatusComplete(message) {
+            statusBadge.className = "inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground";
+            statusBadgeText.textContent = "Completed";
+            statusIconProcessing.classList.add("hidden");
+            statusIconComplete.classList.remove("hidden");
+
+            statusLine.className = "flex items-center gap-3 text-sm text-muted-foreground";
+            statusLineSpinner.classList.add("hidden");
+            statusLineText.textContent = message;
+        }
+
+        function setStatusError(message) {
+            statusBadge.className = "inline-flex items-center gap-2 rounded-full bg-red-500/10 px-3 py-1 text-xs font-medium text-red-600";
+            statusBadgeText.textContent = "Error";
+            statusIconProcessing.classList.add("hidden");
+            statusIconComplete.classList.add("hidden");
+
+            statusLine.className = "flex items-center gap-3 text-sm text-red-600";
+            statusLineSpinner.classList.add("hidden");
+            statusLineText.textContent = message;
+        }
+
+        function updateProgress(percent) {
+            const clamped = Math.max(0, Math.min(100, percent));
+            currentProgress = clamped;
+            progressPercent.textContent = `${Math.round(clamped)}%`;
+            progressFill.style.width = `${clamped}%`;
+        }
+
+        function renderHistory(items) {
+            if (!Array.isArray(items) || items.length === 0) {
+                historyEmpty.classList.remove("hidden");
+                historyList.classList.add("hidden");
+                historyList.innerHTML = "";
+                return;
+            }
+
+            historyEmpty.classList.add("hidden");
+            historyList.classList.remove("hidden");
+            historyList.innerHTML = "";
+
+            items.forEach(item => {
+                const row = document.createElement("div");
+                row.className = "flex items-center justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted/50";
+                row.innerHTML = `
+                    <div>
+                        <code class="text-sm font-mono text-foreground">${item.jobId}</code>
+                        <p class="mt-1 text-xs text-muted-foreground">${item.timestamp}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-flex items-center rounded-full border border-border bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">Completed</span>
+                        <p class="mt-1 text-xs font-semibold tabular-nums text-muted-foreground">${item.progress}%</p>
+                    </div>
+                `;
+                historyList.appendChild(row);
+            });
+        }
+
+        function loadHistory() {
+            try {
+                return JSON.parse(localStorage.getItem("jobHistory") || "[]");
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function saveCompletedJob(jobId) {
+            const now = new Date().toLocaleString();
+            const existing = loadHistory();
+            const updated = [{ jobId, status: "Completed", progress: 100, timestamp: now }, ...existing].slice(0, 10);
+            localStorage.setItem("jobHistory", JSON.stringify(updated));
+            renderHistory(updated);
+        }
+
+        copyBtn.addEventListener("click", () => {
+            navigator.clipboard.writeText("{{ id }}").then(() => {
+                copyIcon.classList.add("hidden");
+                checkIcon.classList.remove("hidden");
+                setTimeout(() => {
+                    checkIcon.classList.add("hidden");
+                    copyIcon.classList.remove("hidden");
+                }, 2000);
+            });
+        });
+
+        renderHistory(loadHistory());
+
+        ws.onopen = function () {
+            setConnected(true);
+            setStatusProcessing("Job is running…");
+        };
+
+        ws.onmessage = function (event) {
+            const maybeProgress = parseInt(event.data, 10);
+            if (Number.isNaN(maybeProgress)) {
+                return;
+            }
+
+            updateProgress(maybeProgress);
+
+            if (!completed) {
+                setStatusProcessing(`Processing: ${Math.round(currentProgress)}% complete`);
+            }
+
+            if (currentProgress >= 100 && !completed) {
+                completed = true;
+                setStatusComplete("Job completed successfully!");
+                saveCompletedJob("{{ id }}");
+            }
+        };
+
+        ws.onclose = function () {
+            setConnected(false);
+            if (!completed) {
+                setStatusError("Connection lost");
+            }
+        };
+
+        ws.onerror = function () {
+            setConnected(false);
+            if (!completed) {
+                setStatusError("An error occurred");
+            }
+        };
+    </script>
+
+</body>
+
+</html>

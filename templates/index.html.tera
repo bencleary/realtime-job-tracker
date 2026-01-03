@@ -3,37 +3,264 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Process -> Socket Communication</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="color-scheme" content="light dark">
+    <title>Job Dashboard - Real-Time Progress Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        @theme {
+            --color-background: oklch(100% 0 0);
+            --color-foreground: oklch(15% 0.01 285);
+            --color-card: oklch(100% 0 0);
+            --color-muted: oklch(96% 0.004 285);
+            --color-muted-foreground: oklch(55% 0.015 285);
+            --color-border: oklch(92% 0.01 285);
+            --color-primary: oklch(60% 0.22 255);
+            --color-accent: oklch(55% 0.18 160);
+            --color-accent-foreground: oklch(98% 0.01 340);
+            --color-chart-1: oklch(60% 0.22 255);
+            --color-chart-3: oklch(65% 0.24 35);
+            --color-chart-4: oklch(65% 0.24 290);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            @theme {
+                --color-background: oklch(15% 0.02 285);
+                --color-foreground: oklch(98% 0.004 285);
+                --color-card: oklch(15% 0.02 285);
+                --color-muted: oklch(25% 0.015 285);
+                --color-muted-foreground: oklch(70% 0.01 285);
+                --color-border: oklch(25% 0.015 285);
+                --color-primary: oklch(60% 0.22 255);
+                --color-accent: oklch(55% 0.18 160);
+                --color-accent-foreground: oklch(98% 0.01 340);
+                --color-chart-1: oklch(60% 0.22 255);
+                --color-chart-3: oklch(65% 0.24 35);
+                --color-chart-4: oklch(65% 0.24 290);
+            }
+        }
+
+        .dark {
+            --color-background: oklch(15% 0.02 285);
+            --color-foreground: oklch(98% 0.004 285);
+            --color-card: oklch(15% 0.02 285);
+            --color-muted: oklch(25% 0.015 285);
+            --color-muted-foreground: oklch(70% 0.01 285);
+            --color-border: oklch(25% 0.015 285);
+        }
+
+        @keyframes ping {
+            75%, 100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        .animate-ping {
+            animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+    </style>
+    <script>
+        (function () {
+            const storageKey = "theme";
+            const root = document.documentElement;
+            const stored = localStorage.getItem(storageKey);
+            const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+            if (stored === "dark" || (!stored && prefersDark)) root.classList.add("dark");
+        })();
+    </script>
 </head>
 
-<body>
+<body class="min-h-screen bg-background text-foreground">
+    <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div class="flex justify-end">
+            <button id="theme-toggle" type="button"
+                class="inline-flex items-center justify-center rounded-lg border border-border bg-transparent px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                aria-label="Toggle theme">
+                <svg class="h-4 w-4 dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z"></path>
+                </svg>
+                <svg class="hidden h-4 w-4 dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="4"></circle>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 20v2"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.93 4.93l1.41 1.41"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.66 17.66l1.41 1.41"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 12h2"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 12h2"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.34 17.66l-1.41 1.41"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.07 4.93l-1.41 1.41"></path>
+                </svg>
+            </button>
+        </div>
+        <!-- Header -->
+        <header class="mb-16 text-center">
+            <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-medium text-muted-foreground">
+                <span class="relative flex h-2 w-2">
+                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75"></span>
+                    <span class="relative inline-flex h-2 w-2 rounded-full bg-accent"></span>
+                </span>
+                WebSocket-Powered Monitoring
+            </div>
+            <h1 class="mb-4 text-5xl font-bold tracking-tight lg:text-6xl">Job Dashboard</h1>
+            <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
+                Select a job type to start background processing with real-time progress tracking
+            </p>
+        </header>
 
-    <div class="flex items-center justify-center">
-        <div class="flex flex-col gap-2" style="width: 300px;">
-            <span>Worker ID</span>
-            <h1>{{ id }}</h1>
-            <div>
-                <label for="processing">Processing progress:</label>
-                <progress class="w-full" id="processing" value="0" max="100"></progress>
+        <!-- Job Types Grid -->
+        <div class="mb-20 grid gap-6 sm:grid-cols-2 lg:gap-8">
+            <!-- Simple Counter -->
+            <div class="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-primary/5">
+                <div class="p-6">
+                    <div class="mb-4 flex items-start justify-between">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-chart-1/10">
+                            <svg class="h-6 w-6 text-chart-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                            </svg>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">~10 seconds</span>
+                    </div>
+                    <h2 class="text-2xl font-semibold">Simple Counter</h2>
+                    <p class="mt-2 text-base leading-relaxed text-muted-foreground">
+                        A basic counting job that increments from 0 to 100% with regular intervals. Perfect for testing the WebSocket connection.
+                    </p>
+                </div>
+                <div class="p-6 pt-0">
+                    <a href="/job?type=simple-counter" class="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3 text-base font-medium text-white transition-colors hover:opacity-90">
+                        Start Job
+                    </a>
+                </div>
+            </div>
+
+            <!-- File Processing -->
+            <div class="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-primary/5">
+                <div class="p-6">
+                    <div class="mb-4 flex items-start justify-between">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
+                            <svg class="h-6 w-6 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14 2v6h6" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 13h8" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 17h8" />
+                            </svg>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">~9 seconds</span>
+                    </div>
+                    <h2 class="text-2xl font-semibold">File Processing</h2>
+                    <p class="mt-2 text-base leading-relaxed text-muted-foreground">
+                        Simulates processing multiple files (CSV, ZIP, PDF, JSON, TXT) with varying processing times based on file type.
+                    </p>
+                </div>
+                <div class="p-6 pt-0">
+                    <a href="/job?type=file-processing" class="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3 text-base font-medium text-white transition-colors hover:opacity-90">
+                        Start Job
+                    </a>
+                </div>
+            </div>
+
+            <!-- Data Aggregation -->
+            <div class="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-primary/5">
+                <div class="p-6">
+                    <div class="mb-4 flex items-start justify-between">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-chart-4/10">
+                            <svg class="h-6 w-6 text-chart-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 20V10" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M18 20V4" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 20v-6" />
+                            </svg>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">~9 seconds</span>
+                    </div>
+                    <h2 class="text-2xl font-semibold">Data Aggregation</h2>
+                    <p class="mt-2 text-base leading-relaxed text-muted-foreground">
+                        Demonstrates multi-step data pipeline: fetching from multiple sources, computing metrics, and generating insights.
+                    </p>
+                </div>
+                <div class="p-6 pt-0">
+                    <a href="/job?type=data-aggregation" class="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3 text-base font-medium text-white transition-colors hover:opacity-90">
+                        Start Job
+                    </a>
+                </div>
+            </div>
+
+            <!-- Batch Operation -->
+            <div class="group relative overflow-hidden rounded-2xl border border-border bg-card transition-all hover:shadow-lg hover:shadow-primary/5">
+                <div class="p-6">
+                    <div class="mb-4 flex items-start justify-between">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-chart-3/10">
+                            <svg class="h-6 w-6 text-chart-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 18h18" />
+                            </svg>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">~10 seconds</span>
+                    </div>
+                    <h2 class="text-2xl font-semibold">Batch Operation</h2>
+                    <p class="mt-2 text-base leading-relaxed text-muted-foreground">
+                        Processes items in batches with variable processing times. Useful for demonstrating queue-based operations.
+                    </p>
+                </div>
+                <div class="p-6 pt-0">
+                    <a href="/job?type=batch-operation" class="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-3 text-base font-medium text-white transition-colors hover:opacity-90">
+                        Start Job
+                    </a>
+                </div>
             </div>
         </div>
+
+        <!-- Features Section -->
+        <section class="mb-20">
+            <div class="mb-10 text-center">
+                <h2 class="mb-3 text-3xl font-bold tracking-tight">Features</h2>
+                <p class="text-muted-foreground">Built to showcase real-time capabilities</p>
+            </div>
+            <div class="grid gap-8 sm:grid-cols-3">
+                <div class="flex flex-col items-center text-center">
+                    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-3xl">⚡</div>
+                    <h3 class="mb-2 text-lg font-semibold">Real-Time Updates</h3>
+                    <p class="text-sm leading-relaxed text-muted-foreground">WebSocket-powered progress tracking with instant updates</p>
+                </div>
+                <div class="flex flex-col items-center text-center">
+                    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-3xl">🔄</div>
+                    <h3 class="mb-2 text-lg font-semibold">Multiple Job Types</h3>
+                    <p class="text-sm leading-relaxed text-muted-foreground">Different processing patterns to showcase versatility</p>
+                </div>
+                <div class="flex flex-col items-center text-center">
+                    <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-3xl">📊</div>
+                    <h3 class="mb-2 text-lg font-semibold">Job History</h3>
+                    <p class="text-sm leading-relaxed text-muted-foreground">Track completed jobs with persistent browser storage</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech Stack -->
+        <section class="rounded-2xl border border-border bg-card p-8 text-center">
+            <h3 class="mb-6 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Built With</h3>
+            <div class="flex flex-wrap items-center justify-center gap-4 text-sm">
+                <span class="inline-flex items-center rounded-full border border-border bg-transparent px-4 py-2 text-sm">Rust</span>
+                <span class="inline-flex items-center rounded-full border border-border bg-transparent px-4 py-2 text-sm">Poem</span>
+                <span class="inline-flex items-center rounded-full border border-border bg-transparent px-4 py-2 text-sm">Tokio</span>
+                <span class="inline-flex items-center rounded-full border border-border bg-transparent px-4 py-2 text-sm">WebSockets</span>
+                <span class="inline-flex items-center rounded-full border border-border bg-transparent px-4 py-2 text-sm">Tera Templates</span>
+                <span class="inline-flex items-center rounded-full border border-border bg-transparent px-4 py-2 text-sm">Tailwind CSS</span>
+            </div>
+        </section>
     </div>
 
-
-
     <script>
-        let ws = new WebSocket("ws://localhost:3000/ws/{{ id }}");
-        let progressBar = document.getElementById("processing");
-
-        ws.onmessage = function (event) {
-            console.log(event);
-            progressBar.value = parseInt(event.data);
-        }
+        (function () {
+            const storageKey = "theme";
+            const root = document.documentElement;
+            const button = document.getElementById("theme-toggle");
+            if (!button) return;
+            button.addEventListener("click", () => {
+                const isDark = root.classList.toggle("dark");
+                localStorage.setItem(storageKey, isDark ? "dark" : "light");
+            });
+        })();
     </script>
-
 </body>
 
 </html>
